@@ -7,7 +7,7 @@
 
 #include <cstdio>
 
-const unsigned int FIRST_CHAR = 32;
+const int FIRST_CHAR = 32;
 
 Font font_hack10;
 TTF_Font* test;
@@ -15,6 +15,15 @@ TTF_Font* test;
 unsigned int glyph_vao;
 
 bool font_load(Font* font, const char* path, unsigned int size);
+
+int next_largest_power_of_two(int number) {
+    int power_of_two = 1;
+    while (power_of_two < number) {
+        power_of_two *= 2;
+    }
+
+    return power_of_two;
+}
 
 bool font_init() {
     if (TTF_Init() == -1) {
@@ -71,7 +80,6 @@ bool font_load(Font* font, const char* path, unsigned int size) {
 
     // Render each glyph to a surface
     SDL_Surface* glyphs[96];
-    GLint internal_format;
     int max_width;
     int max_height;
     for (int i = 0; i < 96; i++) {
@@ -89,36 +97,20 @@ bool font_load(Font* font, const char* path, unsigned int size) {
         }
     }
 
-    // Determine internal format
-    if (glyphs[0]->format->BytesPerPixel == 4) {
-        if (glyphs[0]->format->Rmask == 0x000000ff) {
-            internal_format = GL_RGBA;
-            printf("internal format is rgba\n");
-        } else {
-            internal_format = GL_BGRA;
-            printf("internal format is bgra\n");
-        }
-    } else {
-        if (glyphs[0]->format->Rmask == 0x000000ff) {
-            internal_format = GL_RGB;
-            printf("internal format is rgb\n");
-        } else {
-            internal_format = GL_BGR;
-            printf("internal format is bgr\n");
-        }
+    int atlas_width = next_largest_power_of_two(max_width * 96);
+    int atlas_height = next_largest_power_of_two(max_height);
+    SDL_Surface* atlas_surface = SDL_CreateRGBSurface(0, atlas_width, atlas_height, 32, 0x00ff0000,0x0000ff00,0x000000ff,0xff000000);
+    for (int i = 0; i < 96; i++) {
+        SDL_Rect dest_rect = (SDL_Rect) { .x = max_width * i, .y = 0, .w = glyphs[i]->w, .h = glyphs[i]->h };
+        SDL_BlitSurface(glyphs[i], NULL, atlas_surface, &dest_rect);
     }
-
 
     // Generate OpenGL texture
-    GLubyte empty_data[max_width * 96 * max_height * 4];
     glGenTextures(1, &font->atlas);
     glBindTexture(GL_TEXTURE_2D, font->atlas);
-    glTexImage2D(GL_TEXTURE_2D, 0, glyphs[0]->format->BytesPerPixel, max_width * 96, max_height, 0, internal_format, GL_UNSIGNED_BYTE, empty_data);
-
-    // Render each glyph onto the texture atlas
-    for (int i = 0; i < 96; i++) {
-        glTexSubImage2D(GL_TEXTURE_2D, 0, max_width * i, 0, max_width, max_height, internal_format, GL_UNSIGNED_BYTE, glyphs[i]->pixels);
-    }
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas_width, atlas_height, 0, GL_BGRA, GL_UNSIGNED_BYTE, atlas_surface->pixels);
 
     // Finish setting up font struct
     font->glyph_width = (unsigned int)max_width;
@@ -129,6 +121,7 @@ bool font_load(Font* font, const char* path, unsigned int size) {
     for (int i = 0; i < 96; i++) {
         SDL_FreeSurface(glyphs[i]);
     }
+    SDL_FreeSurface(atlas_surface);
     TTF_CloseFont(ttf_font);
 
     return true;
@@ -143,45 +136,31 @@ bool font_load(Font* font, const char* path, unsigned int size) {
     return power*2;
   }
 
-void font_render(const Font& font, std::string text, int x, int y) {
-    /*glUseProgram(text_shader);
-    float render_coords[2] = { x, y };
-    glUniform2fv(glGetUniformLocation(text_shader, "render_coords"), 1, &render_coords[0]);
-    float render_size[2] = { (float)font.glyph_width * 96.0f, font.glyph_height };
+void font_render(const Font& font, std::string text, int x, int y, SDL_Color color) {
+    glUseProgram(text_shader);
+    float atlas_size[2] = { (float)next_largest_power_of_two(font.glyph_width * 96), (float)next_largest_power_of_two(font.glyph_height) };
+    glUniform2fv(glGetUniformLocation(text_shader, "atlas_size"), 1, &atlas_size[0]);
+    float render_size[2] = { (float)font.glyph_width, (float)font.glyph_height };
     glUniform2fv(glGetUniformLocation(text_shader, "render_size"), 1, &render_size[0]);
+    float font_color[3] = { color.r / 255.0f, color.g / 255.0f, color.b / 255.0f };
+    glUniform3fv(glGetUniformLocation(text_shader, "font_color"), 1, &font_color[0]);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font.atlas);
     glBindVertexArray(glyph_vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);*/
+    float render_coords[2] = { (float)x, (float)y };
+    float texture_offset[2] = { (float)0.0f, 0.0f };
+    for (char c : text) {
+        int glyph_index = (int)c - FIRST_CHAR;
+        texture_offset[0] = (float)(font.glyph_width * glyph_index);
+        glUniform2fv(glGetUniformLocation(text_shader, "render_coords"), 1, &render_coords[0]);
+        glUniform2fv(glGetUniformLocation(text_shader, "texture_offset"), 1, &texture_offset[0]);
 
-    SDL_Surface* test_surface = TTF_RenderText_Blended(test, "hello", (SDL_Color){ .r = 255, .g = 255, .b = 255, .a = 255 });
-    unsigned int test_w = power_two_floor(test_surface->w) * 2;
-    unsigned int test_h = power_two_floor(test_surface->h) * 2;
-    SDL_Surface* other = SDL_CreateRGBSurface(0, test_w, test_h, 32, 0x00ff0000,0x0000ff00,0x000000ff,0xff000000);
-    SDL_BlitSurface(test_surface, NULL, other, NULL);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    GLuint texture;
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, other->w, other->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, other->pixels);
-
-    glUseProgram(text_shader);
-    float render_coords[2] = { x, y };
-    glUniform2fv(glGetUniformLocation(text_shader, "render_coords"), 1, &render_coords[0]);
-    float render_size[2] = { (float)test_surface->w, (float)test_surface->h };
-    glUniform2fv(glGetUniformLocation(text_shader, "render_size"), 1, &render_size[0]);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glBindVertexArray(glyph_vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+        render_coords[0] += font.glyph_width;
+    }
 
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);

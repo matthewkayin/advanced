@@ -125,7 +125,7 @@ int main() {
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        font_render(font_hack10, "hello", 0, 0);
+        font_render(font_hack10, "FPS: " + std::to_string(fps), 0, 0, (SDL_Color) { .r = 255, .g = 255, .b = 0, .a = 255 });
 
         SDL_GL_SwapWindow(window);
         frames++;
