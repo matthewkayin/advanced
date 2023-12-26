@@ -3,12 +3,15 @@
 #endif
 
 #include "shader.hpp"
+#include "font.hpp"
 
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #include <cstdio>
 
+// Engine
 SDL_Window* window;
 SDL_GLContext context;
 
@@ -55,7 +58,10 @@ int main() {
         return -1;
     }
 
-    if (!shader_compile_all()) {
+    if (!shader_init()) {
+        return -1;
+    }
+    if (!font_init()) {
         return -1;
     }
 
@@ -118,10 +124,14 @@ int main() {
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        font_render(font_hack10, "hello", 0, 0);
+
         SDL_GL_SwapWindow(window);
         frames++;
     }
 
+    TTF_Quit();
     SDL_DestroyWindow(window);
     SDL_Quit();
 

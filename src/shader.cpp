@@ -9,8 +9,11 @@ GLuint text_shader;
 
 bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);
 
-bool shader_compile_all() {
+bool shader_init() {
     if (!shader_compile(&shader, "./shader/vertex.glsl", "./shader/fragment.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&text_shader, "./shader/text_vertex.glsl", "./shader/text_fragment.glsl")) {
         return false;
     }
 
