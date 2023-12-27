@@ -2,94 +2,101 @@
 
 #include <fstream>
 #include <cstdio>
-#include <sstream>
+#include <fstream>
+#include <map>
+#include <vector>
 
 GLuint shader;
 GLuint text_shader;
 
-bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);
+const std::map<std::string, GLenum> SHADER_TYPE = {
+    { "vertex", GL_VERTEX_SHADER },
+    { "fragment", GL_FRAGMENT_SHADER }
+};
+
+bool shader_compile(unsigned int* id, const char* path);
 
 bool shader_init() {
-    if (!shader_compile(&shader, "./shader/vertex.glsl", "./shader/fragment.glsl")) {
+    if (!shader_compile(&shader, "./shader/shader.glsl")) {
         return false;
     }
-    if (!shader_compile(&text_shader, "./shader/text_vertex.glsl", "./shader/text_fragment.glsl")) {
+    if (!shader_compile(&text_shader, "./shader/text.glsl")) {
         return false;
     }
 
     return true;
 }
 
-bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path) {
-    std::string vertex_code;
-    std::string fragment_code;
-    std::ifstream vertex_shader_file;
-    std::ifstream fragment_shader_file;
+bool shader_compile(unsigned int* id, const char* path) {
+    std::ifstream shader_file;
+    std::string line;
+    std::string version_string;
 
-    // ensure ifstream objects can throw exceptions
-    vertex_shader_file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    fragment_shader_file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    struct ShaderData {
+        std::string type_name;
+        std::string source;
+        GLint id;
+    };
+    std::map<GLenum, ShaderData> shaders;
+    GLenum current_shader;
 
-    try {
-        vertex_shader_file.open(vertex_path);
-        fragment_shader_file.open(fragment_path);
-        std::stringstream vertex_shader_stream;
-        std::stringstream fragment_shader_stream;
-
-        vertex_shader_stream << vertex_shader_file.rdbuf();
-        fragment_shader_stream << fragment_shader_file.rdbuf();
-
-        vertex_shader_file.close();
-        fragment_shader_file.close();
-
-        vertex_code = vertex_shader_stream.str();
-        fragment_code = fragment_shader_stream.str();
-    } catch (std::exception& e) {
-        printf("Error: shader file (%s, %s) not successfully read\n", vertex_path, fragment_path);
+    // open shader file
+    shader_file.open(path);
+    if (!shader_file.is_open()) {
+        printf("Unable to open shader %s\n", path);
         return false;
     }
 
-    const char* vertex_shader_code = vertex_code.c_str();
-    const char* fragment_shader_code = fragment_code.c_str();
+    // read shader file
+    while (std::getline(shader_file, line)) {
+        if (line.rfind("#version") == 0) {
+            version_string = line;
+        } else if (line.rfind("#begin") == 0) {
+            std::string shader_type = line.substr(line.find(" ") + 1);
+            GLenum gl_shader_type = SHADER_TYPE.at(shader_type);
+            shaders[gl_shader_type].source = version_string + "\n";
+            current_shader = gl_shader_type;
+        } else {
+            shaders[current_shader].source += line + "\n";
+        }
+    }
+    shader_file.close();
 
-    unsigned int vertex;
-    unsigned int fragment;
+    // compile shaders
     int success;
     char info_log[512];
 
-    vertex = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex, 1, &vertex_shader_code, NULL);
-    glCompileShader(vertex);
-    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(vertex, 512, NULL, info_log);
-        printf("Error: vertex shader %s compilation failed\n%s\n", vertex_path, info_log);
-        return false;
+    for (std::map<GLenum, ShaderData>::iterator itr = shaders.begin(); itr != shaders.end(); ++itr) {
+        itr->second.id = glCreateShader(itr->first);
+        const char* shader_source = itr->second.source.c_str();
+        glShaderSource(itr->second.id, 1, &shader_source, NULL);
+        glCompileShader(itr->second.id);
+        glGetShaderiv(itr->second.id, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(itr->second.id, 512, NULL, info_log);
+            printf("Error: shader with path %s failed to compile %s shader.\n%s\n", path, itr->second.type_name.c_str(), info_log);
+            return false;
+        }
+
     }
 
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment, 1, &fragment_shader_code, NULL);
-    glCompileShader(fragment);
-    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fragment, 512, NULL, info_log);
-        printf("Error: fragment shader %s compilation failed\n%s\n", fragment_path, info_log);
-        return false;
+    // link program
+    GLuint program = glCreateProgram();
+    for (std::map<GLenum, ShaderData>::iterator itr = shaders.begin(); itr != shaders.end(); ++itr) {
+        glAttachShader(program, itr->second.id);
     }
 
-    unsigned int program = glCreateProgram();
-    glAttachShader(program, vertex);
-    glAttachShader(program, fragment);
     glLinkProgram(program);
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(program, 512, NULL, info_log);
-        printf("Error linking shader program (%s %s) \n%s\n", vertex_path, fragment_path, info_log);
+        printf("Error linking shader program %s.\n%s\n", path, info_log);
         return false;
     }
 
-    glDeleteShader(vertex);
-    glDeleteShader(fragment);
+    for (std::map<GLenum, ShaderData>::iterator itr = shaders.begin(); itr != shaders.end(); ++itr) {
+        glDeleteShader(itr->second.id);
+    }
 
     *id = program;
     return true;

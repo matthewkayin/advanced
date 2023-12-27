@@ -8,6 +8,7 @@
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <glm/glm.hpp>
 
 #include <cstdio>
 
@@ -125,7 +126,7 @@ int main() {
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        font_render(font_hack10, "FPS: " + std::to_string(fps), 0, 0, (SDL_Color) { .r = 255, .g = 255, .b = 0, .a = 255 });
+        font_render(font_hack10, "FPS: " + std::to_string(fps), glm::vec2(0.0f, 0.0f), FONT_COLOR_WHITE);
 
         SDL_GL_SwapWindow(window);
         frames++;

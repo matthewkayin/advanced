@@ -4,6 +4,7 @@
 #include "global.hpp"
 
 #include <SDL2/SDL_ttf.h>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <cstdio>
 
@@ -136,30 +137,29 @@ bool font_load(Font* font, const char* path, unsigned int size) {
     return power*2;
   }
 
-void font_render(const Font& font, std::string text, int x, int y, SDL_Color color) {
+void font_render(const Font& font, std::string text, glm::vec2 render_pos, glm::vec3 color) {
     glUseProgram(text_shader);
-    float atlas_size[2] = { (float)next_largest_power_of_two(font.glyph_width * 96), (float)next_largest_power_of_two(font.glyph_height) };
-    glUniform2fv(glGetUniformLocation(text_shader, "atlas_size"), 1, &atlas_size[0]);
-    float render_size[2] = { (float)font.glyph_width, (float)font.glyph_height };
-    glUniform2fv(glGetUniformLocation(text_shader, "render_size"), 1, &render_size[0]);
-    float font_color[3] = { color.r / 255.0f, color.g / 255.0f, color.b / 255.0f };
-    glUniform3fv(glGetUniformLocation(text_shader, "font_color"), 1, &font_color[0]);
+    glm::vec2 atlas_size = glm::vec2((float)next_largest_power_of_two(font.glyph_width * 96), (float)next_largest_power_of_two(font.glyph_height));
+    glUniform2fv(glGetUniformLocation(text_shader, "atlas_size"), 1, glm::value_ptr(atlas_size));
+    glm::vec2 render_size = glm::vec2((float)font.glyph_width, (float)font.glyph_height);
+    glUniform2fv(glGetUniformLocation(text_shader, "render_size"), 1, glm::value_ptr(render_size));
+    glUniform3fv(glGetUniformLocation(text_shader, "font_color"), 1, glm::value_ptr(color));
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font.atlas);
     glBindVertexArray(glyph_vao);
 
-    float render_coords[2] = { (float)x, (float)y };
-    float texture_offset[2] = { (float)0.0f, 0.0f };
+    glm::vec2 render_coords = render_pos;
+    glm::vec2 texture_offset;
     for (char c : text) {
         int glyph_index = (int)c - FIRST_CHAR;
-        texture_offset[0] = (float)(font.glyph_width * glyph_index);
-        glUniform2fv(glGetUniformLocation(text_shader, "render_coords"), 1, &render_coords[0]);
-        glUniform2fv(glGetUniformLocation(text_shader, "texture_offset"), 1, &texture_offset[0]);
+        texture_offset.x = (float)(font.glyph_width * glyph_index);
+        glUniform2fv(glGetUniformLocation(text_shader, "render_coords"), 1, glm::value_ptr(render_coords));
+        glUniform2fv(glGetUniformLocation(text_shader, "texture_offset"), 1, glm::value_ptr(texture_offset));
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        render_coords[0] += font.glyph_width;
+        render_coords.x += font.glyph_width;
     }
 
     glBindVertexArray(0);
