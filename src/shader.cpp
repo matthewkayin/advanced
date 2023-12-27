@@ -7,6 +7,7 @@
 #include <vector>
 
 GLuint shader;
+GLuint light_shader;
 GLuint text_shader;
 
 const std::map<std::string, GLenum> SHADER_TYPE = {
@@ -18,6 +19,9 @@ bool shader_compile(unsigned int* id, const char* path);
 
 bool shader_init() {
     if (!shader_compile(&shader, "./shader/shader.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&light_shader, "./shader/light.glsl")) {
         return false;
     }
     if (!shader_compile(&text_shader, "./shader/text.glsl")) {
