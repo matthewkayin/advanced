@@ -1,13 +1,35 @@
 #include "model.hpp"
 
+#include "shader.hpp"
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #include <fstream>
 #include <cstdio>
+#include <queue>
 
-bool model_load(Model* model, std::string path) {
+GLuint model_unit_texture[MODEL_UNIT_COLOR_COUNT];
+Model model_unit[MODEL_UNIT_COUNT];
+std::queue<ModelUnitTransform> model_unit_render_queue[MODEL_UNIT_COUNT];
+
+bool model_init() {
+    if (!model_texture_load(&model_unit_texture[MODEL_UNIT_COLOR_BLUE], "./res/texture/Units_Blue.png")) {
+        return false;
+    }
+    if (!model_texture_load(&model_unit_texture[MODEL_UNIT_COLOR_RED], "./res/texture/Units_Red.png")) {
+        return false;
+    }
+    if (!model_load(&model_unit[MODEL_UNIT_TANK], std::vector<std::string> { "./res/model/Tank/Tank-0.obj", "./res/model/Tank/Tank-1.obj", "./res/model/Tank/Tank-2.obj" })) {
+        return false;
+    }
+    return true;
+}
+
+bool model_load(Model* model, std::vector<std::string> paths) {
     // define structs
     struct Face {
         unsigned int position_indices[3];
@@ -20,62 +42,72 @@ bool model_load(Model* model, std::string path) {
         glm::vec2 texture_coordinates;
     };
 
-    // open file
-    std::ifstream filein;
-    filein.open(path.c_str());
-    
-    if (!filein.is_open()) {
-        printf("Unable to open model %s\n", path.c_str());
-        return false;
-    }
-
     std::vector<glm::vec3> positions;
     std::vector<glm::vec2> texture_coordinates;
     std::vector<glm::vec3> normals;
     std::vector<Face> faces;
 
-    std::string line;
-    while (std::getline(filein, line)) {
-        // ignore comments
-        if (line == "" || line[0] == '#') {
-            continue;
+    unsigned int position_base_index = 0;
+    unsigned int texture_coordinate_base_index = 0;
+    unsigned int normal_base_index = 0;
+
+    for (std::string path : paths) {
+        // open file
+        std::ifstream filein;
+        filein.open(path.c_str());
+        
+        if (!filein.is_open()) {
+            printf("Unable to open model %s\n", path.c_str());
+            return false;
         }
 
-        // split line into words
-        std::vector<std::string> words;
-        while (line != "") {
-            std::size_t space_index = line.find(" ");
-            if (space_index == std::string::npos) {
-                words.push_back(line);
-                line = "";
-            } else {
-                words.push_back(line.substr(0, space_index));
-                line = line.substr(space_index + 1);
+        position_base_index = positions.size();
+        texture_coordinate_base_index = texture_coordinates.size();
+        normal_base_index = normals.size();
+
+        std::string line;
+        while (std::getline(filein, line)) {
+            // ignore comments
+            if (line == "" || line[0] == '#') {
+                continue;
+            }
+
+            // split line into words
+            std::vector<std::string> words;
+            while (line != "") {
+                std::size_t space_index = line.find(" ");
+                if (space_index == std::string::npos) {
+                    words.push_back(line);
+                    line = "";
+                } else {
+                    words.push_back(line.substr(0, space_index));
+                    line = line.substr(space_index + 1);
+                }
+            }
+
+            // parse line
+            if (words[0] == "v") {
+                positions.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
+            } else if (words[0] == "vt") {
+                texture_coordinates.push_back(glm::vec2(std::stof(words[1]), std::stof(words[2])));
+            } else if (words[0] == "vn") {
+                normals.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
+            } else if (words[0] == "f") {
+                Face face;
+                for (unsigned int i = 0; i < 3; i++) {
+                    std::size_t slash_index = words[i + 1].find("/");
+                    std::size_t second_slash_index = words[i + 1].find("/", slash_index + 1);
+                    // subtract all indices by one because OBJ file indices start at 1 instead of 0
+                    face.position_indices[i] = position_base_index + (std::stoi(words[i + 1].substr(0, slash_index)) - 1);
+                    face.texture_coordinate_indices[i] = texture_coordinate_base_index + (std::stoi(words[i + 1].substr(slash_index + 1, second_slash_index)) - 1);
+                    face.normal_indices[i] = normal_base_index + (std::stoi(words[i + 1].substr(second_slash_index + 1)) - 1);
+                }
+                faces.push_back(face);
             }
         }
 
-        // parse line
-        if (words[0] == "v") {
-            positions.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
-        } else if (words[0] == "vt") {
-            texture_coordinates.push_back(glm::vec2(std::stof(words[1]), std::stof(words[2])));
-        } else if (words[0] == "vn") {
-            normals.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
-        } else if (words[0] == "f") {
-            Face face;
-            for (unsigned int i = 0; i < 3; i++) {
-                std::size_t slash_index = words[i + 1].find("/");
-                std::size_t second_slash_index = words[i + 1].find("/", slash_index + 1);
-                // subtract all indices by one because OBJ file indices start at 1 instead of 0
-                face.position_indices[i] = std::stoi(words[i + 1].substr(0, slash_index)) - 1;
-                face.texture_coordinate_indices[i] = std::stoi(words[i + 1].substr(slash_index + 1, second_slash_index)) - 1;
-                face.normal_indices[i] = std::stoi(words[i + 1].substr(second_slash_index + 1)) - 1;
-            }
-            faces.push_back(face);
-        }
+        filein.close();
     }
-
-    filein.close();
 
     std::vector<VertexData> vertex_data;
     for (Face face : faces) {
@@ -87,8 +119,6 @@ bool model_load(Model* model, std::string path) {
             });
         }
     }
-
-    glGenTextures(1, &model->texture);
 
     glGenVertexArrays(1, &model->vao);
     glGenBuffers(1, &model->vbo);
@@ -108,11 +138,13 @@ bool model_load(Model* model, std::string path) {
 
     model->vertex_data_size = vertex_data.size();
 
-    // Load texture
-    std::string texture_path = path.replace(path.find(".obj"), 4, ".png");
-    SDL_Surface* texture_surface = IMG_Load(texture_path.c_str());
+    return true;
+}
+
+bool model_texture_load(GLuint* texture, std::string path) {
+    SDL_Surface* texture_surface = IMG_Load(path.c_str());
     if (texture_surface == NULL) {
-        printf("Unable to load model texture at path %s\n", texture_path.c_str());
+        printf("Unable to load model texture at path %s\n", path.c_str());
         return false;
     }
 
@@ -130,12 +162,14 @@ bool model_load(Model* model, std::string path) {
             texture_format = GL_BGR;
         }
     } else {
-        printf("Texture format of texture %s not recognized\n", texture_path.c_str());
+        printf("Texture format of texture %s not recognized\n", path.c_str());
         return false;
     }
 
+    glGenTextures(1, texture);
+
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, model->texture);
+    glBindTexture(GL_TEXTURE_2D, *texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -146,4 +180,39 @@ bool model_load(Model* model, std::string path) {
     SDL_FreeSurface(texture_surface);
 
     return true;
+} 
+
+void model_unit_queue_render(ModelUnit model_unit_index, ModelUnitTransform transform) {
+    model_unit_render_queue[model_unit_index].push(transform);
+}
+
+void model_unit_render_from_queues() {
+    glUseProgram(shader);
+    glActiveTexture(GL_TEXTURE0);
+
+    for (unsigned int i = 0; i < MODEL_UNIT_COUNT; i++) {
+        if (model_unit_render_queue[i].empty()) {
+            continue;
+        }
+
+        glBindVertexArray(model_unit[i].vao);
+        while (!model_unit_render_queue[i].empty()) {
+            ModelUnitTransform transform = model_unit_render_queue[i].front();
+            model_unit_render_queue[i].pop();
+
+            // set uniforms
+            glm::mat4 model_matrix = glm::mat4(1.0f);
+            model_matrix = glm::translate(model_matrix, transform.position);
+            glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
+
+            // bind texture
+            // TODO? group render calls by texture / unit color
+            glBindTexture(GL_TEXTURE_2D, model_unit_texture[transform.color]);
+
+            // draw
+            glDrawArrays(GL_TRIANGLES, 0, model_unit[i].vertex_data_size);
+        }
+    }
+
+    glBindVertexArray(0);
 }

@@ -76,6 +76,9 @@ int main() {
     if (!font_init()) {
         return -1;
     }
+    if (!model_init()) {
+        return -1;
+    }
 
     // Set OpenGL flags
     glEnable(GL_DEPTH_TEST);
@@ -98,9 +101,6 @@ int main() {
     glUniform1f(glGetUniformLocation(shader, "point_light.constant"), 1.0f);
     glUniform1f(glGetUniformLocation(shader, "point_light.linear"), 0.09f);
     glUniform1f(glGetUniformLocation(shader, "point_light.quadratic"), 0.032f);
-
-    Model model_tank;
-    model_load(&model_tank, "./res/model/Tank/Tank-2.obj");
 
     // Game loop
     bool running = true;
@@ -134,18 +134,11 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBlendFunc(GL_ONE, GL_ZERO);
-        glUseProgram(shader);
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
-        model = glm::rotate(model, SDL_GetTicks() / 1000.0f, glm::vec3(0.0f, 1.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
-        glActiveTexture(GL_TEXTURE0);
-
-        glBindVertexArray(model_tank.vao);
-        glBindTexture(GL_TEXTURE_2D, model_tank.texture);
-        glDrawArrays(GL_TRIANGLES, 0, model_tank.vertex_data_size);
-        glBindVertexArray(0);
+        model_unit_queue_render(MODEL_UNIT_TANK, (ModelUnitTransform) {
+            .position = glm::vec3(0.0f, -1.0f, 0.0f),
+            .color = MODEL_UNIT_COLOR_BLUE
+        });
+        model_unit_render_from_queues();
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         font_render(font_hack10, "FPS: " + std::to_string(fps), glm::vec2(0.0f, 0.0f), FONT_COLOR_WHITE);
