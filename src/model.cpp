@@ -11,10 +11,34 @@
 #include <fstream>
 #include <cstdio>
 #include <queue>
+#include <map>
 
 GLuint model_unit_texture[MODEL_UNIT_COLOR_COUNT];
 Model model_unit[MODEL_UNIT_COUNT];
-std::queue<ModelUnitTransform> model_unit_render_queue[MODEL_UNIT_COUNT];
+std::queue<ModelTransform> model_unit_render_queue[MODEL_UNIT_COUNT * MODEL_UNIT_COLOR_COUNT];
+
+const std::string TERRAIN_PATH_PREFIX = "./res/model/Terrain/";
+const std::map<ModelTerrain, std::string> TERRAIN_PATH_SUFFIX = {
+    { MODEL_TERRAIN_AIRPORT, "Airport.obj" },
+    { MODEL_TERRAIN_BASE, "Base.obj" },
+    { MODEL_TERRAIN_BEACH, "Beach.obj" },
+    { MODEL_TERRAIN_BEACH_INNER_CORNER, "Beach_InnerCorner.obj" },
+    { MODEL_TERRAIN_BEACH_OUTER_CORNER, "Beach_OuterCorner.obj" },
+    { MODEL_TERRAIN_BRIDGE, "Bridge.obj" },
+    { MODEL_TERRAIN_CITY, "City.obj" },
+    { MODEL_TERRAIN_FOREST, "Forest.obj" },
+    { MODEL_TERRAIN_MOUNTAIN_HIGH, "Mountain_High.obj" },
+    { MODEL_TERRAIN_MOUNTAIN_LOW, "Mountain_low.obj" },
+    { MODEL_TERRAIN_QG, "QG.obj" },
+    { MODEL_TERRAIN_RIVER, "River.obj" },
+    { MODEL_TERRAIN_ROAD, "Road.obj" },
+    { MODEL_TERRAIN_ROAD_CORNER, "Road_Corner.obj" },
+    { MODEL_TERRAIN_SEA, "Sea.obj" }
+};
+
+GLuint model_terrain_texture;
+Model model_terrain[MODEL_TERRAIN_COUNT];
+std::queue<ModelTransform> model_terrain_render_queue[MODEL_TERRAIN_COUNT];
 
 bool model_init() {
     if (!model_texture_load(&model_unit_texture[MODEL_UNIT_COLOR_BLUE], "./res/texture/Units_Blue.png")) {
@@ -23,8 +47,16 @@ bool model_init() {
     if (!model_texture_load(&model_unit_texture[MODEL_UNIT_COLOR_RED], "./res/texture/Units_Red.png")) {
         return false;
     }
+    if (!model_texture_load(&model_terrain_texture, "./res/texture/Terrain.png")) {
+        return false;
+    }
     if (!model_load(&model_unit[MODEL_UNIT_TANK], std::vector<std::string> { "./res/model/Tank/Tank-0.obj", "./res/model/Tank/Tank-1.obj", "./res/model/Tank/Tank-2.obj" })) {
         return false;
+    }
+    for (unsigned int i = 0; i < MODEL_TERRAIN_COUNT; i++) {
+        if (!model_load(&model_terrain[i], std::vector<std::string> { TERRAIN_PATH_PREFIX + TERRAIN_PATH_SUFFIX.at((ModelTerrain)i) } )) {
+            return false;
+        }
     }
     return true;
 }
@@ -182,37 +214,73 @@ bool model_texture_load(GLuint* texture, std::string path) {
     return true;
 } 
 
-void model_unit_queue_render(ModelUnit model_unit_index, ModelUnitTransform transform) {
-    model_unit_render_queue[model_unit_index].push(transform);
+void model_unit_queue_render(ModelUnit model_unit_index, ModelUnitColor model_unit_color, ModelTransform transform) {
+    model_unit_render_queue[(model_unit_index * MODEL_UNIT_COLOR_COUNT) + model_unit_color].push(transform);
 }
 
 void model_unit_render_from_queues() {
     glUseProgram(shader);
     glActiveTexture(GL_TEXTURE0);
 
-    for (unsigned int i = 0; i < MODEL_UNIT_COUNT; i++) {
-        if (model_unit_render_queue[i].empty()) {
+    for (unsigned int model_index = 0; model_index < MODEL_UNIT_COUNT; model_index++) {
+        bool has_bound_vao = false;
+        for (unsigned int color_index = 0; color_index < MODEL_UNIT_COLOR_COUNT; color_index++) {
+            unsigned int queue_index = (model_index * MODEL_UNIT_COLOR_COUNT) + color_index;
+            if (model_unit_render_queue[queue_index].empty()) {
+                continue;
+            }
+
+            if (!has_bound_vao) {
+                glBindVertexArray(model_unit[model_index].vao);
+                has_bound_vao = true;
+            }
+
+            glBindTexture(GL_TEXTURE_2D, model_unit_texture[color_index]);
+
+            while (!model_unit_render_queue[queue_index].empty()) {
+                ModelTransform transform = model_unit_render_queue[queue_index].front();
+                model_unit_render_queue[queue_index].pop();
+
+                // set uniforms
+                glm::mat4 model_matrix = glm::mat4(1.0f);
+                model_matrix = glm::translate(model_matrix, transform.position);
+                glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
+
+                // draw
+                glDrawArrays(GL_TRIANGLES, 0, model_unit[model_index].vertex_data_size);
+            }
+        }
+    }
+
+    glBindVertexArray(0);
+}
+
+void model_terrain_queue_render(ModelTerrain model_terrain_index, ModelTransform transform) {
+    model_terrain_render_queue[model_terrain_index].push(transform);
+}
+
+void model_terrain_render_from_queues() {
+    glUseProgram(shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, model_terrain_texture);
+
+    for (unsigned int i = 0; i < MODEL_TERRAIN_COUNT; i++) {
+        if (model_terrain_render_queue[i].empty()) {
             continue;
         }
 
-        glBindVertexArray(model_unit[i].vao);
-        while (!model_unit_render_queue[i].empty()) {
-            ModelUnitTransform transform = model_unit_render_queue[i].front();
-            model_unit_render_queue[i].pop();
+        glBindVertexArray(model_terrain[i].vao);
+        while (!model_terrain_render_queue[i].empty()) {
+            ModelTransform transform = model_terrain_render_queue[i].front();
+            model_terrain_render_queue[i].pop();
 
             // set uniforms
             glm::mat4 model_matrix = glm::mat4(1.0f);
             model_matrix = glm::translate(model_matrix, transform.position);
             glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
 
-            // bind texture
-            // TODO? group render calls by texture / unit color
-            glBindTexture(GL_TEXTURE_2D, model_unit_texture[transform.color]);
-
             // draw
             glDrawArrays(GL_TRIANGLES, 0, model_unit[i].vertex_data_size);
         }
     }
-
-    glBindVertexArray(0);
 }

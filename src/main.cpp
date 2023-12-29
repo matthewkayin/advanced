@@ -134,11 +134,14 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBlendFunc(GL_ONE, GL_ZERO);
-        model_unit_queue_render(MODEL_UNIT_TANK, (ModelUnitTransform) {
+        model_unit_queue_render(MODEL_UNIT_TANK, MODEL_UNIT_COLOR_BLUE, (ModelTransform) {
             .position = glm::vec3(0.0f, -1.0f, 0.0f),
-            .color = MODEL_UNIT_COLOR_BLUE
         });
         model_unit_render_from_queues();
+        model_terrain_queue_render(MODEL_TERRAIN_BASE, (ModelTransform) {
+            .position = glm::vec3(0.0f, 0.0f, 0.0f)
+        });
+        model_terrain_render_from_queues();
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         font_render(font_hack10, "FPS: " + std::to_string(fps), glm::vec2(0.0f, 0.0f), FONT_COLOR_WHITE);
