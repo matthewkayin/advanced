@@ -6,6 +6,7 @@
 #include "font.hpp"
 #include "model.hpp"
 #include "global.hpp"
+#include "scene.hpp"
 
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
@@ -79,28 +80,11 @@ int main() {
     if (!model_init()) {
         return -1;
     }
+    scene_init();
 
     // Set OpenGL flags
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-
-    glUseProgram(shader);
-    glm::mat4 projection = glm::mat4(1.0f);
-    projection = glm::perspective(glm::radians(45.0f), (float)SCREEN_WIDTH / float(SCREEN_HEIGHT), 0.1f, 100.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glm::mat4 view = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-    glUniformMatrix4fv(glGetUniformLocation(shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glm::vec3 view_pos = glm::vec3(0.0f, 0.0f, -3.0f);
-    glUniform3fv(glGetUniformLocation(shader, "view_pos"), 1, glm::value_ptr(view_pos));
-    glUniform1i(glGetUniformLocation(shader, "model_texture"), 0);
-    
-    // light uniforms
-    glm::vec3 light_pos = glm::vec3(-1.0f, 1.0f, 1.0f);
-    glUniform3fv(glGetUniformLocation(shader, "point_light.position"), 1, glm::value_ptr(light_pos));
-    glUniform1f(glGetUniformLocation(shader, "point_light.constant"), 1.0f);
-    glUniform1f(glGetUniformLocation(shader, "point_light.linear"), 0.09f);
-    glUniform1f(glGetUniformLocation(shader, "point_light.quadratic"), 0.032f);
 
     // Game loop
     bool running = true;
@@ -124,24 +108,25 @@ int main() {
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
                 running = false;
+            } else if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                }
+            } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+            } else {
+                scene_handle_input(e);
             }
         }
 
         // Update
+        scene_update(delta);
 
         // Render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBlendFunc(GL_ONE, GL_ZERO);
-        model_unit_queue_render(MODEL_UNIT_TANK, MODEL_UNIT_COLOR_BLUE, (ModelTransform) {
-            .position = glm::vec3(0.0f, -1.0f, 0.0f),
-        });
-        model_unit_render_from_queues();
-        model_terrain_queue_render(MODEL_TERRAIN_BASE, (ModelTransform) {
-            .position = glm::vec3(0.0f, 0.0f, 0.0f)
-        });
-        model_terrain_render_from_queues();
+        scene_render();
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         font_render(font_hack10, "FPS: " + std::to_string(fps), glm::vec2(0.0f, 0.0f), FONT_COLOR_WHITE);

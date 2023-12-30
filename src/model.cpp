@@ -219,9 +219,6 @@ void model_unit_queue_render(ModelUnit model_unit_index, ModelUnitColor model_un
 }
 
 void model_unit_render_from_queues() {
-    glUseProgram(shader);
-    glActiveTexture(GL_TEXTURE0);
-
     for (unsigned int model_index = 0; model_index < MODEL_UNIT_COUNT; model_index++) {
         bool has_bound_vao = false;
         for (unsigned int color_index = 0; color_index < MODEL_UNIT_COLOR_COUNT; color_index++) {
