@@ -50,7 +50,13 @@ bool model_init() {
     if (!model_texture_load(&model_terrain_texture, "./res/texture/Terrain.png")) {
         return false;
     }
-    if (!model_load(&model_unit[MODEL_UNIT_TANK], std::vector<std::string> { "./res/model/Tank/Tank-0.obj", "./res/model/Tank/Tank-1.obj", "./res/model/Tank/Tank-2.obj" })) {
+    if (!model_load(&model_unit[MODEL_UNIT_TANK], std::vector<std::string> { "./res/model/Tank/Tank-0.obj", "./res/model/Tank/Tank-1.obj" })) {
+        return false;
+    }
+    if (!model_load(&model_unit[MODEL_UNIT_INFANTERY], std::vector<std::string> { "./res/model/Infantery/Infantery-0.obj" })) {
+        return false;
+    }
+    if (!model_load(&model_unit[MODEL_UNIT_BAZOOKA], std::vector<std::string> { "./res/model/Bazooka/Bazooka-0.obj" })) {
         return false;
     }
     for (unsigned int i = 0; i < MODEL_TERRAIN_COUNT; i++) {
@@ -241,6 +247,7 @@ void model_unit_render_from_queues() {
                 // set uniforms
                 glm::mat4 model_matrix = glm::mat4(1.0f);
                 model_matrix = glm::translate(model_matrix, transform.position);
+                model_matrix = glm::scale(model_matrix, glm::vec3(0.75f));
                 glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
 
                 // draw
@@ -277,7 +284,7 @@ void model_terrain_render_from_queues() {
             glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
 
             // draw
-            glDrawArrays(GL_TRIANGLES, 0, model_unit[i].vertex_data_size);
+            glDrawArrays(GL_TRIANGLES, 0, model_terrain[i].vertex_data_size);
         }
     }
 }

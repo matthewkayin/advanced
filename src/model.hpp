@@ -13,6 +13,8 @@ struct Model {
 
 enum ModelUnit {
     MODEL_UNIT_TANK,
+    MODEL_UNIT_INFANTERY,
+    MODEL_UNIT_BAZOOKA,
     MODEL_UNIT_COUNT
 };
 
