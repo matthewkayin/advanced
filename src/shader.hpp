@@ -6,5 +6,6 @@
 
 extern GLuint shader;
 extern GLuint text_shader;
+extern GLuint screen_shader;
 
 bool shader_init();

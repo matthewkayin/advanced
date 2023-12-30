@@ -8,6 +8,7 @@
 
 GLuint shader;
 GLuint text_shader;
+GLuint screen_shader;
 
 const std::map<std::string, GLenum> SHADER_TYPE = {
     { "vertex", GL_VERTEX_SHADER },
@@ -21,6 +22,9 @@ bool shader_init() {
         return false;
     }
     if (!shader_compile(&text_shader, "./shader/text.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&screen_shader, "./shader/screen.glsl")) {
         return false;
     }
 
