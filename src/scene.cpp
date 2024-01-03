@@ -19,6 +19,7 @@ float camera_pitch = 0.0f;
 const Uint8* keys;
 GLuint cube_vao;
 glm::vec3 light_pos = glm::vec3(-1.5f, 2.0f, 1.0f);
+Model car_model;
 
 void scene_init() {
     keys = SDL_GetKeyboardState(NULL);
@@ -37,6 +38,8 @@ void scene_init() {
 
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    model_load(&car_model, "./res/model/civic.obj");
 
     float vertices[] = {
         // positions          // normals           // texture coords
@@ -147,21 +150,16 @@ void scene_update(float delta) {
 }
 
 void scene_render() {
-    glUseProgram(shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBlendFunc(GL_ONE, GL_ZERO);
+
     glm::mat4 view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);
+
+    glUseProgram(shader);
     glUniformMatrix4fv(glGetUniformLocation(shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform3fv(glGetUniformLocation(shader, "view_pos"), 1, glm::value_ptr(camera_position));
-    glActiveTexture(GL_TEXTURE0);
 
-    glBlendFunc(GL_ONE, GL_ZERO);
-    model_unit_queue_render(MODEL_UNIT_TANK, MODEL_UNIT_COLOR_BLUE, (ModelTransform) {
-        .position = glm::vec3(0.0f, -0.5, 0.0f),
-    }); 
-    model_unit_render_from_queues();
-    model_terrain_queue_render(MODEL_TERRAIN_FOREST, (ModelTransform) {
-        .position = glm::vec3(0.0f, 0.0f, 0.0f)
-    });
-    model_terrain_render_from_queues();
+    model_render(car_model, glm::vec3(0.0f));
 
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));

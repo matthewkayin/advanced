@@ -46,14 +46,14 @@ uniform sampler2D model_texture;
 void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
     vec4 light_result = vec4(calculate_point_light(point_light, normal, frag_pos, view_direction), 1.0);
-    // frag_color = light_result * vec4(1.0, 0.0, 0.0, 1.0);
-    frag_color = light_result * texture(model_texture, texture_coordinate);
+    frag_color = light_result * vec4(1.0, 0.0, 0.0, 1.0);
+    // frag_color = light_result * texture(model_texture, texture_coordinate);
 }
 
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction) {
     vec3 light_color = vec3(1.0);
 
-    vec3 ambient = 0.1 * light_color;
+    vec3 ambient = 0.5 * light_color;
 
     vec3 light_direction = normalize(light.position - frag_pos);
     float diffuse_strength = 0.5 * max(dot(normal, light_direction), 0.0); 
