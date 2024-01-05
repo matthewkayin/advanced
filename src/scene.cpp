@@ -39,7 +39,7 @@ void scene_init() {
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-    model_load(&car_model, "./res/model/civic.obj");
+    model_load(&car_model, "./res/civic/civic.obj");
 
     float vertices[] = {
         // positions          // normals           // texture coords

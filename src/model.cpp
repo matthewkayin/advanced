@@ -64,14 +64,6 @@ bool model_load(Model* model, std::string path) {
             }
         }
 
-        if (words.size() > 5) {
-            printf("in object %s:", current_object.c_str());
-            for (std::string word : words) {
-                printf("%s ", word.c_str());
-            }
-            printf("\n");
-        }
-
         // parse line
         if (words[0] == "v") {
             positions.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
@@ -80,15 +72,15 @@ bool model_load(Model* model, std::string path) {
         } else if (words[0] == "vn") {
             normals.push_back(glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3])));
         } else if (words[0] == "f") {
-            for (unsigned int face_index = 0; face_index < words.size() - 3; face_index++) {
+            for (unsigned int face_index = 1; face_index < words.size() - 2; face_index++) {
                 Face face;
-                for (unsigned int i = face_index; i < face_index + 3; i++) {
-                    std::size_t slash_index = words[i + 1].find("/");
-                    std::size_t second_slash_index = words[i + 1].find("/", slash_index + 1);
+                for (unsigned int i = 0; i < 3; i++) {
+                    std::size_t slash_index = words[face_index + i].find("/");
+                    std::size_t second_slash_index = words[face_index + i].find("/", slash_index + 1);
                     // subtract all indices by one because OBJ file indices start at 1 instead of 0
-                    face.position_indices[i] = std::stoi(words[i + 1].substr(0, slash_index)) - 1;
-                    face.texture_coordinate_indices[i] = std::stoi(words[i + 1].substr(slash_index + 1, second_slash_index)) - 1;
-                    face.normal_indices[i] = std::stoi(words[i + 1].substr(second_slash_index + 1)) - 1;
+                    face.position_indices[i] = std::stoi(words[face_index + i].substr(0, slash_index)) - 1;
+                    face.texture_coordinate_indices[i] = std::stoi(words[face_index + i].substr(slash_index + 1, second_slash_index)) - 1;
+                    face.normal_indices[i] = std::stoi(words[face_index + i].substr(second_slash_index + 1)) - 1;
                 }
                 faces[current_object].push_back(face);
             }
@@ -108,19 +100,9 @@ bool model_load(Model* model, std::string path) {
     filein.close();
 
     for (std::map<std::string, std::vector<Face>>::iterator it = faces.begin(); it != faces.end(); ++it) {
-        printf("beginning mesh %s\n", it->first.c_str());
         std::vector<VertexData> vertex_data;
         for (Face face : it->second) {
             for (unsigned int i = 0; i < 3; i++) {
-                if (face.position_indices[i] > positions.size()) {
-                    printf("positions out of bounds\n");
-                }
-                if (face.normal_indices[i] > positions.size()) {
-                    printf("indices out of bounds\n");
-                }
-                if (face.texture_coordinate_indices[i] > positions.size()) {
-                    printf("tex coords out of bounds\n");
-                }
                 vertex_data.push_back((VertexData) {
                     .position = positions[face.position_indices[i]],
                     .normal = normals[face.normal_indices[i]],
@@ -129,7 +111,6 @@ bool model_load(Model* model, std::string path) {
             }
         }
 
-        printf("sending vertex data\n");
         Mesh new_mesh;
         new_mesh.vertex_data_size = vertex_data.size();
         glGenVertexArrays(1, &new_mesh.vao);
