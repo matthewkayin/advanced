@@ -11,7 +11,12 @@
 #include <fstream>
 #include <cstdio>
 
+GLuint null_texture;
+
 bool model_init() {
+    if (!model_texture_load(&null_texture, "./res/null_texture.png")) {
+        return false;
+    }
     return true;
 }
 
@@ -43,6 +48,7 @@ bool model_load(Model* model, std::string path) {
     }
 
     std::string current_object = "";
+    std::string mtllib_path = "";
 
     std::string line;
     while (std::getline(filein, line)) {
@@ -54,6 +60,10 @@ bool model_load(Model* model, std::string path) {
         // split line into words
         std::vector<std::string> words;
         while (line != "") {
+            if (line[0] == ' ') {
+                line = line.substr(1);
+                continue;
+            }
             std::size_t space_index = line.find(" ");
             if (space_index == std::string::npos) {
                 words.push_back(line);
@@ -75,12 +85,13 @@ bool model_load(Model* model, std::string path) {
             for (unsigned int face_index = 1; face_index < words.size() - 2; face_index++) {
                 Face face;
                 for (unsigned int i = 0; i < 3; i++) {
-                    std::size_t slash_index = words[face_index + i].find("/");
-                    std::size_t second_slash_index = words[face_index + i].find("/", slash_index + 1);
+                    unsigned int index = i == 0 ? 1 : face_index + i;
+                    std::size_t slash_index = words[index].find("/");
+                    std::size_t second_slash_index = words[index].find("/", slash_index + 1);
                     // subtract all indices by one because OBJ file indices start at 1 instead of 0
-                    face.position_indices[i] = std::stoi(words[face_index + i].substr(0, slash_index)) - 1;
-                    face.texture_coordinate_indices[i] = std::stoi(words[face_index + i].substr(slash_index + 1, second_slash_index)) - 1;
-                    face.normal_indices[i] = std::stoi(words[face_index + i].substr(second_slash_index + 1)) - 1;
+                    face.position_indices[i] = std::stoi(words[index].substr(0, slash_index)) - 1;
+                    face.texture_coordinate_indices[i] = std::stoi(words[index].substr(slash_index + 1, second_slash_index)) - 1;
+                    face.normal_indices[i] = std::stoi(words[index].substr(second_slash_index + 1)) - 1;
                 }
                 faces[current_object].push_back(face);
             }
@@ -95,6 +106,17 @@ bool model_load(Model* model, std::string path) {
                 std::vector<Face> new_face_vector;
                 faces[current_object] = new_face_vector;
             }
+        } else if (words[0] == "mtllib") {
+            mtllib_path = "";
+            for (unsigned int i = 1; i < words.size(); i++) {
+                mtllib_path += words[i];
+            }
+        } else if (words[0] == "usemtl") {
+            std::string mtl_name = "";
+            for (unsigned int i = 1; i < words.size(); i++) {
+                mtl_name += words[i];
+            }
+            model->mesh[current_object].material = mtl_name;
         }
     }
     filein.close();
@@ -132,13 +154,88 @@ bool model_load(Model* model, std::string path) {
         model->mesh[it->first] = new_mesh;
     }
 
+    // Read mtl file
+    std::size_t path_last_forward_slash = path.rfind('/');
+    std::string path_folder = path_last_forward_slash == std::string::npos ? "./" : path.substr(0, path_last_forward_slash + 1);
+    std::string mtl_path = path_folder + mtllib_path;
+    std::ifstream mtl_filein;
+    mtl_filein.open(mtl_path.c_str());
+
+    if (!mtl_filein.is_open()) {
+        printf("Unable to open material lib %s\n", mtllib_path.c_str());
+        return false;
+    }
+
+    std::string current_material = "";
+
+    while (std::getline(mtl_filein, line)) {
+        // ignore comments
+        if (line == "" || line[0] == '#') {
+            continue;
+        }
+
+        // split line into words
+        std::vector<std::string> words;
+        while (line != "") {
+            if (line[0] == ' ') {
+                line = line.substr(1);
+                continue;
+            }
+            std::size_t space_index = line.find(" ");
+            if (space_index == std::string::npos) {
+                words.push_back(line);
+                line = "";
+            } else {
+                words.push_back(line.substr(0, space_index));
+                line = line.substr(space_index + 1);
+            }
+        }
+
+        // parse line
+        if (words[0] == "newmtl") {
+            std::string mtl_name = "";
+            for (unsigned int i = 1; i < words.size(); i++) {
+                mtl_name += words[i];
+            }
+
+            model->material[current_material] = (Material) {
+                .ka = glm::vec3(0.2f),
+                .kd = glm::vec3(0.8f),
+                .ks = glm::vec3(1.0f),
+                .map_ka = 0,
+                .map_kd = 0
+            };
+        } else if (words[0] == "Ka") {
+            model->material[current_material].ka = glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3]));
+        } else if (words[0] == "Kd") {
+            model->material[current_material].kd = glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3]));
+        } else if (words[0] == "Ks") {
+            model->material[current_material].ks = glm::vec3(std::stof(words[1]), std::stof(words[2]), std::stof(words[3]));
+        } else if (words[0] == "map_Ka") {
+            // TODO support non-png textures
+            if (words[1].find(".png") == std::string::npos) {
+                continue;
+            }
+
+            model_texture_load(&model->material[current_material].map_ka, path_folder + words[1]);
+        } else if (words[0] == "map_Kd") {
+            // TODO support non-png textures
+            if (words[1].find(".png") == std::string::npos) {
+                continue;
+            }
+
+            model_texture_load(&model->material[current_material].map_kd, path_folder + words[1]);
+        }
+    }
+    mtl_filein.close();
+
     return true;
 }
 
 bool model_texture_load(GLuint* texture, std::string path) {
     SDL_Surface* texture_surface = IMG_Load(path.c_str());
     if (texture_surface == NULL) {
-        printf("Unable to load model texture at path %s\n", path.c_str());
+        printf("Unable to load model texture at path %s: %s\n", path.c_str(), IMG_GetError());
         return false;
     }
 
@@ -168,7 +265,7 @@ bool model_texture_load(GLuint* texture, std::string path) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, texture_format, texture_surface->w, texture_surface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_surface->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_surface->w, texture_surface->h, 0, texture_format, GL_UNSIGNED_BYTE, texture_surface->pixels);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     SDL_FreeSurface(texture_surface);
@@ -183,8 +280,30 @@ void model_render(Model& model, glm::vec3 position) {
     glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
 
     for (std::map<std::string, Mesh>::iterator it = model.mesh.begin(); it != model.mesh.end(); ++it) {
+        glUniform3fv(glGetUniformLocation(shader, "material.ka"), 1, glm::value_ptr(model.material[it->second.material].ka));
+        glUniform3fv(glGetUniformLocation(shader, "material.kd"), 1, glm::value_ptr(model.material[it->second.material].kd));
+        glUniform3fv(glGetUniformLocation(shader, "material.ks"), 1, glm::value_ptr(model.material[it->second.material].ks));
+        glActiveTexture(GL_TEXTURE0);
+        if (model.material[it->second.material].map_ka != 0) {
+            glBindTexture(GL_TEXTURE_2D, model.material[it->second.material].map_ka);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, null_texture);
+        }
+        glActiveTexture(GL_TEXTURE0 + 1);
+        if (model.material[it->second.material].map_kd != 0) {
+            glBindTexture(GL_TEXTURE_2D, model.material[it->second.material].map_kd);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, null_texture);
+        }
+        glUniform1i(glGetUniformLocation(shader, "material.map_ka"), 0);
+        glUniform1i(glGetUniformLocation(shader, "material.map_kd"), 1);
+
         glBindVertexArray(it->second.vao);
         glDrawArrays(GL_TRIANGLES, 0, it->second.vertex_data_size);
     }
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
 }

@@ -18,8 +18,12 @@ float camera_pitch = 0.0f;
 
 const Uint8* keys;
 GLuint cube_vao;
+GLuint floor_vao;
+GLuint floor_texture;
 glm::vec3 light_pos = glm::vec3(-1.5f, 2.0f, 1.0f);
 Model car_model;
+
+void scene_generate_cube(GLuint* vao, glm::vec3 size);
 
 void scene_init() {
     keys = SDL_GetKeyboardState(NULL);
@@ -39,65 +43,10 @@ void scene_init() {
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-    model_load(&car_model, "./res/civic/civic.obj");
-
-    float vertices[] = {
-        // positions          // normals           // texture coords
-        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
-
-        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
-         0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
-
-        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-
-         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
-
-        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
-    };
-
-    GLuint cube_vbo;
-    glGenVertexArrays(1, &cube_vao);
-    glGenBuffers(1, &cube_vbo);
-    glBindVertexArray(cube_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    model_load(&car_model, "./res/Car 02/Car2.obj");
+    scene_generate_cube(&cube_vao, glm::vec3(0.5f));
+    scene_generate_cube(&floor_vao, glm::vec3(100.0f, 0.01f, 100.0f));
+    model_texture_load(&floor_texture, "./res/floor.png");
 }
 
 void scene_handle_input(SDL_Event e) {
@@ -161,6 +110,14 @@ void scene_render() {
 
     model_render(car_model, glm::vec3(0.0f));
 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, floor_texture);
+    glm::mat4 floor_model = glm::mat4(1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(floor_model));
+    glBindVertexArray(floor_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform3fv(glGetUniformLocation(light_shader, "view_pos"), 1, glm::value_ptr(camera_position));
@@ -171,4 +128,64 @@ void scene_render() {
     glBindVertexArray(cube_vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
+}
+
+void scene_generate_cube(GLuint* vao, glm::vec3 size) {
+    float vertices[] = {
+        // positions          // normals           // texture coords
+        -size.x, -size.y, -size.z,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
+         size.x, -size.y, -size.z,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
+         size.x,  size.y, -size.z,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
+         size.x,  size.y, -size.z,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
+        -size.x,  size.y, -size.z,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f,
+        -size.x, -size.y, -size.z,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
+
+        -size.x, -size.y,  size.z,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
+         size.x, -size.y,  size.z,  0.0f,  0.0f,  1.0f,  1.0f,  0.0f,
+         size.x,  size.y,  size.z,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
+         size.x,  size.y,  size.z,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
+        -size.x,  size.y,  size.z,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f,
+        -size.x, -size.y,  size.z,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
+
+        -size.x,  size.y,  size.z, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+        -size.x,  size.y, -size.z, -1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+        -size.x, -size.y, -size.z, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+        -size.x, -size.y, -size.z, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+        -size.x, -size.y,  size.z, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+        -size.x,  size.y,  size.z, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+
+         size.x,  size.y,  size.z,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+         size.x,  size.y, -size.z,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+         size.x, -size.y, -size.z,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+         size.x, -size.y, -size.z,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+         size.x, -size.y,  size.z,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+         size.x,  size.y,  size.z,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+
+        -size.x, -size.y, -size.z,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
+         size.x, -size.y, -size.z,  0.0f, -1.0f,  0.0f,  1.0f,  1.0f,
+         size.x, -size.y,  size.z,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
+         size.x, -size.y,  size.z,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
+        -size.x, -size.y,  size.z,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f,
+        -size.x, -size.y, -size.z,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
+
+        -size.x,  size.y, -size.z,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,
+         size.x,  size.y, -size.z,  0.0f,  1.0f,  0.0f,  1.0f,  1.0f,
+         size.x,  size.y,  size.z,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
+         size.x,  size.y,  size.z,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
+        -size.x,  size.y,  size.z,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
+        -size.x,  size.y, -size.z,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
+    };
+
+    GLuint vbo;
+    glGenVertexArrays(1, vao);
+    glGenBuffers(1, &vbo);
+    glBindVertexArray(*vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 }

@@ -207,6 +207,7 @@ int main() {
 
         glUseProgram(screen_shader);
         glBindVertexArray(quad_vao);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture_color_buffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);

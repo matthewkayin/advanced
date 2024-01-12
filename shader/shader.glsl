@@ -18,10 +18,18 @@ void main() {
 
     frag_pos = vec3(model * vec4(a_pos, 1.0));
     normal = normalize(mat3(transpose(inverse(model))) * a_normal);
-    texture_coordinate = a_texture_coordinate;
+    texture_coordinate = vec2(a_texture_coordinate.x, 1 - a_texture_coordinate.y);
 }
 
 #begin fragment
+
+struct Material {
+    vec3 ka;
+    vec3 kd;
+    vec3 ks;
+    sampler2D map_ka;
+    sampler2D map_kd;
+};
 
 struct PointLight {
     vec3 position;
@@ -41,28 +49,25 @@ out vec4 frag_color;
 
 uniform vec3 view_pos;
 uniform PointLight point_light;
-uniform sampler2D model_texture;
+uniform Material material;
 
 void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
-    vec4 light_result = vec4(calculate_point_light(point_light, normal, frag_pos, view_direction), 1.0);
-    frag_color = light_result * vec4(1.0, 0.0, 0.0, 1.0);
-    // frag_color = light_result * texture(model_texture, texture_coordinate);
+    frag_color = vec4(calculate_point_light(point_light, normal, frag_pos, view_direction), 1.0);
 }
 
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction) {
-    vec3 light_color = vec3(1.0);
-
-    vec3 ambient = 0.5 * light_color;
+    vec3 ambient = material.ka * vec3(texture(material.map_ka, texture_coordinate));
 
     vec3 light_direction = normalize(light.position - frag_pos);
-    float diffuse_strength = 0.5 * max(dot(normal, light_direction), 0.0); 
-    vec3 diffuse = diffuse_strength * light_color;
+    float diffuse_strength = max(dot(normal, light_direction), 0.0); 
+    vec3 diffuse_color = material.kd * vec3(texture(material.map_kd, texture_coordinate));
+    vec3 diffuse = diffuse_strength * diffuse_color;
 
     vec3 reflect_direction = reflect(-light_direction, normal);
     vec3 specular = vec3(0.0);
     if (diffuse_strength > 0.0) {
-        specular = 1.0 * pow(max(dot(view_direction, reflect_direction), 0.0), 32.0) * light_color;
+        specular = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0) * material.ks;
     }
 
     float vertex_distance = length(light.position - frag_pos);
