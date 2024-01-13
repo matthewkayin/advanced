@@ -122,6 +122,7 @@ bool model_load(Model* model, std::string path) {
     filein.close();
 
     for (std::map<std::string, std::vector<Face>>::iterator it = faces.begin(); it != faces.end(); ++it) {
+        // get vertex data from faces
         std::vector<VertexData> vertex_data;
         for (Face face : it->second) {
             for (unsigned int i = 0; i < 3; i++) {
@@ -133,7 +134,22 @@ bool model_load(Model* model, std::string path) {
             }
         }
 
+        // center vertex positions around 0,0 and save the offset
+        glm::vec3 vertex_min = vertex_data[0].position;
+        glm::vec3 vertex_max = vertex_data[0].position;
+        for (VertexData v : vertex_data) {
+            for (int i = 0; i < 3; i++) {
+                vertex_min[i] = std::min(v.position[i], vertex_min[i]);
+                vertex_max[i] = std::max(v.position[i], vertex_max[i]);
+            }
+        }
+        glm::vec3 mesh_center = vertex_min + ((vertex_max - vertex_min) / 2.0f);
+        for (VertexData& v : vertex_data) {
+            v.position -= mesh_center;
+        }
+
         Mesh new_mesh;
+        new_mesh.offset = mesh_center;
         new_mesh.vertex_data_size = vertex_data.size();
         glGenVertexArrays(1, &new_mesh.vao);
         glGenBuffers(1, &new_mesh.vbo);
@@ -273,13 +289,17 @@ bool model_texture_load(GLuint* texture, std::string path) {
     return true;
 } 
 
-void model_render(Model& model, glm::vec3 position) {
+void model_render(Model& model, ModelTransform& transform) {
     glUseProgram(shader);
-    glm::mat4 model_matrix = glm::mat4(1.0f);
-    model_matrix = glm::translate(model_matrix, position);
-    glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
 
+    glm::mat4 base_model_matrix = transform.base.to_model();
     for (std::map<std::string, Mesh>::iterator it = model.mesh.begin(); it != model.mesh.end(); ++it) {
+        glm::mat4 model_matrix = base_model_matrix * glm::translate(glm::mat4(1.0f), it->second.offset);
+        if (transform.mesh.count(it->first)) {
+            model_matrix = model_matrix * transform.mesh[it->first].to_model();
+        }
+
+        glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model_matrix));
         glUniform3fv(glGetUniformLocation(shader, "material.ka"), 1, glm::value_ptr(model.material[it->second.material].ka));
         glUniform3fv(glGetUniformLocation(shader, "material.kd"), 1, glm::value_ptr(model.material[it->second.material].kd));
         glUniform3fv(glGetUniformLocation(shader, "material.ks"), 1, glm::value_ptr(model.material[it->second.material].ks));

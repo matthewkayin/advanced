@@ -1,5 +1,7 @@
 #pragma once
 
+#include "transform.hpp"
+
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -18,6 +20,7 @@ struct Mesh {
     GLuint vbo;
     unsigned int vertex_data_size;
     std::string material;
+    glm::vec3 offset;
 };
 
 struct Model {
@@ -25,9 +28,14 @@ struct Model {
     std::map<std::string, Material> material;
 };
 
+struct ModelTransform {
+    Transform base;
+    std::map<std::string, Transform> mesh;
+};
+
 extern GLuint model_null_texture;
 
 bool model_init();
 bool model_load(Model* model, std::string paths);
 bool model_texture_load(GLuint* texture, std::string path);
-void model_render(Model& model, glm::vec3 position);
+void model_render(Model& model, ModelTransform& transform);

@@ -23,6 +23,8 @@ GLuint floor_texture;
 glm::vec3 light_pos = glm::vec3(-5.0f, 10.0f, 1.0f);
 Model car_model;
 
+ModelTransform car_transform;
+
 void scene_generate_cube(GLuint* vao, glm::vec3 size);
 
 void scene_init() {
@@ -47,6 +49,9 @@ void scene_init() {
     scene_generate_cube(&cube_vao, glm::vec3(0.5f));
     scene_generate_cube(&floor_vao, glm::vec3(100.0f, 0.01f, 100.0f));
     model_texture_load(&floor_texture, "./res/floor.png");
+
+    car_transform.mesh["Wheel1"] = Transform();
+    car_transform.base.rotate(3.14f / 4.0f, car_transform.base.get_zbasis());
 }
 
 void scene_handle_input(SDL_Event e) {
@@ -96,20 +101,23 @@ void scene_update(float delta) {
     camera_velocity += glm::cross(camera_front, camera_up) * camera_direction.x;
     
     camera_position += camera_velocity * CAMERA_SPEED * delta;
+
+    car_transform.mesh["Wheel1"].rotate(0.1f * delta, glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 void scene_render() {
+    // setup shader
     glActiveTexture(GL_TEXTURE0);
     glBlendFunc(GL_ONE, GL_ZERO);
-
     glm::mat4 view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);
-
     glUseProgram(shader);
     glUniformMatrix4fv(glGetUniformLocation(shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform3fv(glGetUniformLocation(shader, "view_pos"), 1, glm::value_ptr(camera_position));
 
-    model_render(car_model, glm::vec3(0.0f));
+    // render car
+    model_render(car_model, car_transform);
 
+    // render floor
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, floor_texture);
     glActiveTexture(GL_TEXTURE0 + 1);
@@ -125,6 +133,7 @@ void scene_render() {
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
 
+    // render light
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform3fv(glGetUniformLocation(light_shader, "view_pos"), 1, glm::value_ptr(camera_position));
