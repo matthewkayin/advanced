@@ -25,6 +25,8 @@ struct Model {
     std::map<std::string, Material> material;
 };
 
+extern GLuint model_null_texture;
+
 bool model_init();
 bool model_load(Model* model, std::string paths);
 bool model_texture_load(GLuint* texture, std::string path);

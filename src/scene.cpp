@@ -20,7 +20,7 @@ const Uint8* keys;
 GLuint cube_vao;
 GLuint floor_vao;
 GLuint floor_texture;
-glm::vec3 light_pos = glm::vec3(-1.5f, 2.0f, 1.0f);
+glm::vec3 light_pos = glm::vec3(-5.0f, 10.0f, 1.0f);
 Model car_model;
 
 void scene_generate_cube(GLuint* vao, glm::vec3 size);
@@ -37,13 +37,13 @@ void scene_init() {
     // light uniforms
     glUniform3fv(glGetUniformLocation(shader, "point_light.position"), 1, glm::value_ptr(light_pos));
     glUniform1f(glGetUniformLocation(shader, "point_light.constant"), 1.0f);
-    glUniform1f(glGetUniformLocation(shader, "point_light.linear"), 0.09f);
-    glUniform1f(glGetUniformLocation(shader, "point_light.quadratic"), 0.032f);
+    glUniform1f(glGetUniformLocation(shader, "point_light.linear"), 0.022f);
+    glUniform1f(glGetUniformLocation(shader, "point_light.quadratic"), 0.0019f);
 
     glUseProgram(light_shader);
     glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-    model_load(&car_model, "./res/Car 02/Car2.obj");
+    model_load(&car_model, "./res/car/car.obj");
     scene_generate_cube(&cube_vao, glm::vec3(0.5f));
     scene_generate_cube(&floor_vao, glm::vec3(100.0f, 0.01f, 100.0f));
     model_texture_load(&floor_texture, "./res/floor.png");
@@ -112,8 +112,15 @@ void scene_render() {
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, floor_texture);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, model_null_texture);
     glm::mat4 floor_model = glm::mat4(1.0f);
     glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(floor_model));
+    glUniform3fv(glGetUniformLocation(shader, "material.ka"), 1, glm::value_ptr(glm::vec3(0.5)));
+    glUniform3fv(glGetUniformLocation(shader, "material.kd"), 1, glm::value_ptr(glm::vec3(0.8)));
+    glUniform3fv(glGetUniformLocation(shader, "material.ks"), 1, glm::value_ptr(glm::vec3(1.0)));
+    glUniform1i(glGetUniformLocation(shader, "material.map_ka"), 0);
+    glUniform1i(glGetUniformLocation(shader, "material.map_kd"), 1);
     glBindVertexArray(floor_vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);

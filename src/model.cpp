@@ -11,10 +11,10 @@
 #include <fstream>
 #include <cstdio>
 
-GLuint null_texture;
+GLuint model_null_texture;
 
 bool model_init() {
-    if (!model_texture_load(&null_texture, "./res/null_texture.png")) {
+    if (!model_texture_load(&model_null_texture, "./res/null_texture.png")) {
         return false;
     }
     return true;
@@ -286,14 +286,17 @@ void model_render(Model& model, glm::vec3 position) {
         glActiveTexture(GL_TEXTURE0);
         if (model.material[it->second.material].map_ka != 0) {
             glBindTexture(GL_TEXTURE_2D, model.material[it->second.material].map_ka);
+        // if no ambient map, try using diffuse map
+        } else if (model.material[it->second.material].map_kd != 0) {
+            glBindTexture(GL_TEXTURE_2D, model.material[it->second.material].map_kd);
         } else {
-            glBindTexture(GL_TEXTURE_2D, null_texture);
+            glBindTexture(GL_TEXTURE_2D, model_null_texture);
         }
         glActiveTexture(GL_TEXTURE0 + 1);
         if (model.material[it->second.material].map_kd != 0) {
             glBindTexture(GL_TEXTURE_2D, model.material[it->second.material].map_kd);
         } else {
-            glBindTexture(GL_TEXTURE_2D, null_texture);
+            glBindTexture(GL_TEXTURE_2D, model_null_texture);
         }
         glUniform1i(glGetUniformLocation(shader, "material.map_ka"), 0);
         glUniform1i(glGetUniformLocation(shader, "material.map_kd"), 1);
